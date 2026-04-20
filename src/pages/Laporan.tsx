@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { DUSUN_COLORS, DUSUN_OPTIONS } from '../data/mockData';
 import { getQuestionnaires, type ApiQuestionnaire } from '../services/api';
 import { computeStats, computeDusunData } from '../services/helpers';
+import { CustomSelect } from '../components/UI';
 
 const AGE_ORDER = ['0–4','5–14','15–24','25–39','40–59','60+'];
 
@@ -16,7 +17,7 @@ export default function Laporan(): JSX.Element {
     setLoading(true);
     setError(null);
     try {
-      const data = await getQuestionnaires({ limit: 500 });
+      const data = await getQuestionnaires({ limit: 200 });
       setQuestionnaires(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Gagal memuat data');
@@ -59,10 +60,14 @@ export default function Laporan(): JSX.Element {
       {/* Filter bar */}
       <div className="filter-bar" style={{ marginBottom: 20 }}>
         <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text1)' }}>Filter Laporan</div>
-        <select className="filter-select" value={filterDusun} onChange={e => setFilterDusun(e.target.value)}>
-          <option value="all">Semua Dusun</option>
-          {DUSUN_OPTIONS.map(d => <option key={d} value={d}>{d}</option>)}
-        </select>
+        <CustomSelect
+          value={filterDusun}
+          onChange={setFilterDusun}
+          options={[
+            { value: 'all', label: 'Semua Dusun' },
+            ...DUSUN_OPTIONS.map(d => ({ value: d, label: d })),
+          ]}
+        />
         <button className="btn btn-secondary btn-sm" onClick={fetchData}>↺ Refresh</button>
       </div>
 

@@ -246,3 +246,145 @@ export function Alert({ type = 'info', children }: AlertProps): JSX.Element {
     </div>
   );
 }
+
+// ─── CustomSelect ─────────────────────────────────────────────
+
+interface SelectOption {
+  value: string;
+  label: string;
+}
+
+interface CustomSelectProps {
+  value: string;
+  onChange: (value: string) => void;
+  options: SelectOption[];
+  placeholder?: string;
+  disabled?: boolean;
+  variant?: 'filter' | 'form';
+}
+
+export function CustomSelect({
+  value,
+  onChange,
+  options,
+  placeholder = 'Pilih...',
+  disabled = false,
+  variant = 'filter',
+}: CustomSelectProps): JSX.Element {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  const selected = options.find(o => o.value === value);
+  const isForm = variant === 'form';
+
+  React.useEffect(() => {
+    function handleClick(e: MouseEvent): void {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  const triggerStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    padding: isForm ? '9px 12px' : '6px 10px',
+    border: open
+      ? '1px solid var(--blue)'
+      : '1px solid var(--border)',
+    borderRadius: 8,
+    fontSize: isForm ? 13 : 12,
+    color: selected ? 'var(--text1)' : 'var(--text3)',
+    background: disabled ? 'var(--bg1)' : 'var(--bg2)',
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    outline: 'none',
+    transition: 'border-color .15s, box-shadow .15s',
+    width: isForm ? '100%' : undefined,
+    boxSizing: 'border-box' as const,
+    opacity: disabled ? 0.6 : 1,
+    userSelect: 'none' as const,
+    boxShadow: open ? '0 0 0 3px rgba(11,107,168,.1)' : 'none',
+    minWidth: isForm ? undefined : 130,
+  };
+
+  const dropdownStyle: React.CSSProperties = {
+    position: 'absolute' as const,
+    top: 'calc(100% + 4px)',
+    left: 0,
+    right: 0,
+    background: 'var(--bg2)',
+    border: '1px solid var(--border)',
+    borderRadius: 10,
+    boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+    zIndex: 9999,
+    overflow: 'hidden',
+  };
+
+  return (
+    <div ref={ref} style={{ position: 'relative', width: isForm ? '100%' : undefined, display: 'inline-block' }}>
+      <div
+        style={triggerStyle}
+        onClick={() => { if (!disabled) setOpen(o => !o); }}
+        role="button"
+        tabIndex={disabled ? -1 : 0}
+        onKeyDown={(e: React.KeyboardEvent) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (!disabled) setOpen(o => !o); }
+          if (e.key === 'Escape') setOpen(false);
+        }}
+      >
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {selected ? selected.label : placeholder}
+        </span>
+        <svg
+          width="11" height="11" viewBox="0 0 24 24"
+          fill="none" stroke="var(--text3)" strokeWidth="2.5"
+          style={{ flexShrink: 0, transition: 'transform .2s', transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}
+        >
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </div>
+
+      {open && (
+        <div style={dropdownStyle}>
+          {options.map((opt) => {
+            const isActive = opt.value === value;
+            return (
+              <div
+                key={opt.value}
+                onClick={() => { onChange(opt.value); setOpen(false); }}
+                style={{
+                  padding: '8px 12px',
+                  fontSize: isForm ? 13 : 12,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  color: isActive ? 'var(--blue)' : 'var(--text1)',
+                  background: isActive ? 'var(--blue-light)' : 'transparent',
+                  fontWeight: isActive ? 600 : 400,
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActive) (e.currentTarget as HTMLDivElement).style.background = 'var(--bg3)';
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLDivElement).style.background = isActive ? 'var(--blue-light)' : 'transparent';
+                }}
+              >
+                <span>{opt.label}</span>
+                {isActive && (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" strokeWidth="2.5">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}

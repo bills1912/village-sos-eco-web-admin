@@ -1,6 +1,6 @@
 // src/pages/Dashboard.tsx
 import { useState, useEffect } from 'react';
-import { StatCard, DonutChart, Icons } from '../components/UI';
+import { StatCard, DonutChart, Icons, CustomSelect } from '../components/UI';
 import { DUSUN_COLORS, getAvatarColor, DUSUN_OPTIONS } from '../data/mockData';
 import { getQuestionnaires, type ApiQuestionnaire } from '../services/api';
 import { computeStats, computeDusunData, type ComputedStats } from '../services/helpers';
@@ -251,7 +251,7 @@ export default function Dashboard(): JSX.Element {
       const dusunParam = filterDusun !== 'all'
         ? String(DUSUN_OPTIONS.indexOf(filterDusun) + 1)
         : undefined;
-      const data = await getQuestionnaires({ dusun: dusunParam, limit: 500 });
+      const data = await getQuestionnaires({ dusun: dusunParam, limit: 200 });
       setQuestionnaires(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Gagal memuat data');
@@ -275,10 +275,14 @@ export default function Dashboard(): JSX.Element {
           ))}
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-          <select className="filter-select" value={filterDusun} onChange={e => setFilterDusun(e.target.value)}>
-            <option value="all">Semua Dusun</option>
-            {DUSUN_OPTIONS.map(d => <option key={d} value={d}>{d}</option>)}
-          </select>
+          <CustomSelect
+            value={filterDusun}
+            onChange={setFilterDusun}
+            options={[
+              { value: 'all', label: 'Semua Dusun' },
+              ...DUSUN_OPTIONS.map(d => ({ value: d, label: d })),
+            ]}
+          />
           <button className="btn btn-secondary btn-sm" onClick={fetchData} disabled={loading}>
             ↺ Refresh
           </button>

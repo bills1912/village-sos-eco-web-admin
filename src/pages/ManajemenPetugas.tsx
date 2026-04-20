@@ -1,6 +1,6 @@
 // src/pages/ManajemenPetugas.tsx
 import React, { useState, useMemo, useEffect } from 'react';
-import { Badge, Modal, Icons, Alert } from '../components/UI';
+import { Badge, Modal, Icons, Alert, CustomSelect } from '../components/UI';
 import { DUSUN_OPTIONS, ROLE_LABELS, ROLE_COLORS, getAvatarColor } from '../data/mockData';
 import { getUsers, createUser, updateUser, deleteUser, type ApiUser } from '../services/api';
 import { toUserList, formatDate } from '../services/helpers';
@@ -182,16 +182,16 @@ export default function ManajemenPetugas(): JSX.Element {
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)}
           />
         </div>
-        <select
-          className="filter-select"
+        <CustomSelect
           value={filterRole}
-          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFilterRole(e.target.value as RoleFilter)}
-        >
-          <option value="all">Semua Role</option>
-          <option value="super_admin">Super Admin</option>
-          <option value="admin">Admin</option>
-          <option value="petugas">Petugas</option>
-        </select>
+          onChange={(v) => setFilterRole(v as RoleFilter)}
+          options={[
+            { value: 'all', label: 'Semua Role' },
+            { value: 'super_admin', label: 'Super Admin' },
+            { value: 'admin', label: 'Admin' },
+            { value: 'petugas', label: 'Petugas' },
+          ]}
+        />
         <button className="btn btn-secondary btn-sm" onClick={fetchUsers} disabled={loading}>↺ Refresh</button>
         <div style={{ marginLeft: 'auto' }}>
           <button className="btn btn-primary" onClick={openAdd}><Icons.Plus /> Tambah Pengguna</button>
@@ -297,29 +297,29 @@ export default function ManajemenPetugas(): JSX.Element {
         <div className="form-row">
           <div className="form-group">
             <label className="form-label">Role *</label>
-            <select
-              className="form-select"
+            <CustomSelect
+              variant="form"
               value={formData.role}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setForm('role', e.target.value as Role)}
-            >
-              <option value="petugas">Petugas</option>
-              <option value="admin">Admin</option>
-              <option value="super_admin">Super Admin</option>
-            </select>
+              onChange={(v) => setForm('role', v as Role)}
+              options={[
+                { value: 'petugas', label: 'Petugas' },
+                { value: 'admin', label: 'Admin' },
+                { value: 'super_admin', label: 'Super Admin' },
+              ]}
+            />
           </div>
           <div className="form-group">
             <label className="form-label">Wilayah Tugas</label>
-            <select
-              className="form-select"
-              value={formData.dusun}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setForm('dusun', e.target.value)}
+            <CustomSelect
+              variant="form"
+              value={formData.role !== 'petugas' ? 'Semua' : formData.dusun}
               disabled={formData.role !== 'petugas'}
-            >
-              {formData.role !== 'petugas'
-                ? <option>Semua Dusun</option>
-                : DUSUN_OPTIONS.map(d => <option key={d}>{d}</option>)
+              onChange={(v) => setForm('dusun', v)}
+              options={formData.role !== 'petugas'
+                ? [{ value: 'Semua', label: 'Semua Dusun' }]
+                : DUSUN_OPTIONS.map(d => ({ value: d, label: d }))
               }
-            </select>
+            />
             {formData.role !== 'petugas' && (
               <div className="form-hint">Admin memiliki akses ke semua dusun</div>
             )}
@@ -340,14 +340,15 @@ export default function ManajemenPetugas(): JSX.Element {
           </div>
           <div className="form-group">
             <label className="form-label">Status Akun</label>
-            <select
-              className="form-select"
+            <CustomSelect
+              variant="form"
               value={formData.status}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setForm('status', e.target.value as UserStatus)}
-            >
-              <option value="active">Aktif</option>
-              <option value="inactive">Nonaktif</option>
-            </select>
+              onChange={(v) => setForm('status', v as UserStatus)}
+              options={[
+                { value: 'active', label: 'Aktif' },
+                { value: 'inactive', label: 'Nonaktif' },
+              ]}
+            />
           </div>
         </div>
         <Alert type="info">

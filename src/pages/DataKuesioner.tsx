@@ -1,6 +1,6 @@
 // src/pages/DataKuesioner.tsx
 import React, { useState, useMemo, useEffect } from 'react';
-import { Badge, Icons } from '../components/UI';
+import { Badge, Icons, CustomSelect } from '../components/UI';
 import { DUSUN_OPTIONS } from '../data/mockData';
 import { getQuestionnaires, deleteQuestionnaire, type ApiQuestionnaire } from '../services/api';
 import { toKuesionerList } from '../services/helpers';
@@ -23,7 +23,7 @@ export default function DataKuesioner(): JSX.Element {
       const dusunParam = dusunFilter !== 'all'
         ? String(DUSUN_OPTIONS.indexOf(dusunFilter) + 1)
         : undefined;
-      const data = await getQuestionnaires({ dusun: dusunParam, limit: 500 });
+      const data = await getQuestionnaires({ dusun: dusunParam, limit: 200 });
       setQuestionnaires(data);
       setPage(1);
     } catch (e) {
@@ -85,14 +85,14 @@ export default function DataKuesioner(): JSX.Element {
             }}
           />
         </div>
-        <select
-          className="filter-select"
+        <CustomSelect
           value={dusunFilter}
-          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setDusunFilter(e.target.value)}
-        >
-          <option value="all">Semua Dusun</option>
-          {DUSUN_OPTIONS.map(d => <option key={d} value={d}>{d}</option>)}
-        </select>
+          onChange={(v) => { setDusunFilter(v); setPage(1); }}
+          options={[
+            { value: 'all', label: 'Semua Dusun' },
+            ...DUSUN_OPTIONS.map(d => ({ value: d, label: d })),
+          ]}
+        />
         <button className="btn btn-secondary btn-sm" onClick={fetchData} disabled={loading}>
           ↺ Refresh
         </button>
