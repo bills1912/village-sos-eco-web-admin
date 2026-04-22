@@ -1,6 +1,4 @@
 // src/services/api.ts
-// URL backend Railway. Karena backend sudah set CORS allow_origins=["*"],
-// request langsung dari browser ke Railway diperbolehkan.
 const BASE_URL = 'https://village-survey.up.railway.app/api';
 
 // ─── Token management ──────────────────────────────────────────
@@ -22,10 +20,7 @@ export function getToken(): string | null {
 }
 
 // ─── Fetch helper ───────────────────────────────────────────────
-async function req<T>(
-  path: string,
-  options: RequestInit = {}
-): Promise<T> {
+async function req<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
@@ -35,7 +30,7 @@ async function req<T>(
   let res: Response;
   try {
     res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
-  } catch (networkErr) {
+  } catch {
     throw new Error('Tidak dapat terhubung ke server. Periksa koneksi internet.');
   }
 
@@ -44,7 +39,7 @@ async function req<T>(
     try {
       const body = await res.json() as Record<string, unknown>;
       msg = (body.message as string) || (body.detail as string) || msg;
-    } catch { /* ignore parse error */ }
+    } catch { /* ignore */ }
     throw new Error(msg);
   }
 
@@ -67,13 +62,11 @@ export async function login(email: string, password: string): Promise<LoginRespo
 }
 
 export async function logout(): Promise<void> {
-  try {
-    await req('/logout', { method: 'POST' });
-  } catch { /* ignore */ }
+  try { await req('/logout', { method: 'POST' }); } catch { /* ignore */ }
   clearToken();
 }
 
-// ─── Types mirroring backend ────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────
 export interface ApiUser {
   id: string;
   name: string;
@@ -84,15 +77,15 @@ export interface ApiUser {
 }
 
 export interface ApiAnggota {
-  r_201?: string;   // nama
-  r_202?: string;   // NIK
-  r_203?: string;   // status keluarga
-  r_204?: string;   // status kawin
-  r_205?: string;   // jenis kelamin (1=L, 2=P)
+  r_201?: string;
+  r_202?: string;
+  r_203?: string;
+  r_204?: string;
+  r_205?: string;
   r_207_usia?: number;
-  r_210?: string;   // keberadaan
-  r_211?: string[]; // disabilitas
-  r_212?: string;   // pendidikan
+  r_210?: string;
+  r_211?: string[];
+  r_212?: string;
   r_300_pekerjaan?: string;
   [key: string]: unknown;
 }
@@ -101,9 +94,19 @@ export interface ApiQuestionnaire {
   id?: string;
   survey_id?: string;
   nama_petugas: string;
-  dusun: string;       // '1'–'6'
-  r_102: string;       // No. KK
-  r_103?: string;      // status KK
+  // Wilayah administratif (dari WilayahSnapshot)
+  kode_provinsi?: string;
+  nama_provinsi?: string;
+  kode_kabupaten?: string;
+  nama_kabupaten?: string;
+  kode_kecamatan?: string;
+  nama_kecamatan?: string;
+  kode_desa?: string;
+  nama_desa?: string;
+  // Dusun sebagai teks bebas
+  dusun?: string | null;
+  r_102: string;
+  r_103?: string;
   r_200: ApiAnggota[];
   r_401?: string;
   lokasi_rumah?: { lat: number; lng: number } | null;
@@ -122,15 +125,27 @@ export interface PaginatedResponse<T> {
 
 // ─── Questionnaires ─────────────────────────────────────────────
 export async function getQuestionnaires(params?: {
+  // Wilayah filters
+  kode_provinsi?: string;
+  kode_kabupaten?: string;
+  kode_kecamatan?: string;
+  kode_desa?: string;
+  nama_desa?: string;
+  // Dusun sebagai teks bebas (partial match di backend)
   dusun?: string;
   survey_id?: string;
   page?: number;
   limit?: number;
 }): Promise<ApiQuestionnaire[]> {
   const qs = new URLSearchParams();
-  if (params?.dusun) qs.set('dusun', params.dusun);
-  if (params?.survey_id) qs.set('survey_id', params.survey_id);
-  if (params?.page) qs.set('page', String(params.page));
+  if (params?.kode_provinsi)  qs.set('kode_provinsi',  params.kode_provinsi);
+  if (params?.kode_kabupaten) qs.set('kode_kabupaten', params.kode_kabupaten);
+  if (params?.kode_kecamatan) qs.set('kode_kecamatan', params.kode_kecamatan);
+  if (params?.kode_desa)      qs.set('kode_desa',      params.kode_desa);
+  else if (params?.nama_desa) qs.set('nama_desa',      params.nama_desa);
+  if (params?.dusun)          qs.set('dusun',          params.dusun);
+  if (params?.survey_id)      qs.set('survey_id',      params.survey_id);
+  if (params?.page)           qs.set('page',           String(params.page));
   qs.set('limit', String(Math.min(params?.limit ?? 200, 200)));
 
   const path = `/questionnaires?${qs}`;
@@ -138,20 +153,6 @@ export async function getQuestionnaires(params?: {
 
   if (Array.isArray(body)) return body;
   return body.data ?? body.items ?? [];
-}
-
-export async function createQuestionnaire(q: Omit<ApiQuestionnaire, 'id'>): Promise<ApiQuestionnaire> {
-  return req<ApiQuestionnaire>('/questionnaires', {
-    method: 'POST',
-    body: JSON.stringify(q),
-  });
-}
-
-export async function updateQuestionnaire(id: string, q: ApiQuestionnaire): Promise<ApiQuestionnaire> {
-  return req<ApiQuestionnaire>(`/questionnaires/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(q),
-  });
 }
 
 export async function deleteQuestionnaire(id: string): Promise<void> {
@@ -162,7 +163,7 @@ export async function deleteQuestionnaire(id: string): Promise<void> {
 export interface ApiStats {
   total_kk?: number;
   total_jiwa?: number;
-  total_laki_laki?: number;   // backend uses this field name
+  total_laki_laki?: number;
   total_perempuan?: number;
   per_dusun?: Record<string, number>;
   per_petugas?: Record<string, number>;
@@ -177,14 +178,19 @@ export interface ApiStats {
   [key: string]: unknown;
 }
 
-export async function getStatistics(params?: { dusun?: string; survey_id?: string }): Promise<ApiStats> {
+export async function getStatistics(params?: {
+  kode_desa?: string;
+  dusun?: string;
+  survey_id?: string;
+}): Promise<ApiStats> {
   const qs = new URLSearchParams();
-  if (params?.dusun) qs.set('dusun', params.dusun);
-  if (params?.survey_id) qs.set('survey_id', params.survey_id);
+  if (params?.kode_desa)  qs.set('kode_desa',  params.kode_desa);
+  if (params?.dusun)      qs.set('dusun',      params.dusun);
+  if (params?.survey_id)  qs.set('survey_id',  params.survey_id);
   return req<ApiStats>(`/statistics?${qs}`);
 }
 
-// ─── Users (admin endpoints) ─────────────────────────────────────
+// ─── Users ─────────────────────────────────────────────────────
 export async function getUsers(): Promise<ApiUser[]> {
   const body = await req<ApiUser[] | { data: ApiUser[] }>('/users');
   if (Array.isArray(body)) return body;
@@ -192,19 +198,13 @@ export async function getUsers(): Promise<ApiUser[]> {
 }
 
 export async function createUser(data: {
-  name: string;
-  email: string;
-  password: string;
-  roles?: string[];
+  name: string; email: string; password: string; roles?: string[];
 }): Promise<ApiUser> {
   return req<ApiUser>('/users', { method: 'POST', body: JSON.stringify(data) });
 }
 
 export async function updateUser(id: string, data: Partial<{
-  name: string;
-  email: string;
-  password: string;
-  roles: string[];
+  name: string; email: string; password: string; roles: string[];
 }>): Promise<ApiUser> {
   return req<ApiUser>(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 }
@@ -213,12 +213,9 @@ export async function deleteUser(id: string): Promise<void> {
   await req(`/users/${id}`, { method: 'DELETE' });
 }
 
-// ─── Health check ────────────────────────────────────────────────
 export async function checkHealth(): Promise<boolean> {
   try {
     await fetch('https://village-survey.up.railway.app/health', { signal: AbortSignal.timeout(5000) });
     return true;
-  } catch {
-    return false;
-  }
+  } catch { return false; }
 }

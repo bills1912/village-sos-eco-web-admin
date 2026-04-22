@@ -3,11 +3,23 @@
 
 import type { ApiQuestionnaire, ApiAnggota, ApiUser } from './api';
 import type { Kuesioner, DusunData, User } from '../types';
+import { DUSUN_COLORS } from '../data/mockData';
 
-const DUSUN_LABEL: Record<string, string> = {
-  '1': 'Dusun I-A', '2': 'Dusun I-B', '3': 'Dusun II Timur',
-  '4': 'Dusun II Barat', '5': 'Dusun III', '6': 'Dusun IV',
-};
+// Dusun sekarang teks bebas — tampilkan apa adanya, fallback ke 'Tidak Diketahui'
+export function getDusunLabel(dusun: string | null | undefined): string {
+  if (!dusun || dusun.trim() === '') return 'Tidak Diketahui';
+  return dusun.trim();
+}
+
+// Ambil daftar dusun unik dari data aktual (untuk filter dropdown)
+export function extractDusunOptions(qs: ApiQuestionnaire[]): string[] {
+  const set = new Set<string>();
+  for (const q of qs) {
+    const label = getDusunLabel(q.dusun);
+    if (label !== 'Tidak Diketahui') set.add(label);
+  }
+  return [...set].sort();
+}
 
 const PENDIDIKAN_LABEL: Record<string, string> = {
   '1': 'Tidak/Belum Tamat SD', '2': 'SD/Sederajat', '3': 'SMP/Sederajat',
@@ -27,10 +39,6 @@ const DISABILITAS_LABEL: Record<string, string> = {
   '4': 'Tangan/Jari', '5': 'Mengingat/Konsentrasi', '6': 'Merawat Diri',
   '7': 'Komunikasi', '8': 'Perilaku/Emosi',
 };
-
-export function getDusunLabel(code: string): string {
-  return DUSUN_LABEL[code] ?? `Dusun ${code}`;
-}
 
 // Get KK (head of household) from anggota list
 export function getKepalaKeluarga(anggota: ApiAnggota[]): ApiAnggota | undefined {
@@ -57,7 +65,7 @@ export function toKuesionerList(qs: ApiQuestionnaire[]): Kuesioner[] {
   });
 }
 
-// Compute DusunData[] from questionnaire list
+// Compute DusunData[] from questionnaire list (teks bebas)
 export function computeDusunData(qs: ApiQuestionnaire[]): DusunData[] {
   const dusunMap: Record<string, { kk: number; jiwa: number; l: number; p: number }> = {};
 
@@ -72,19 +80,20 @@ export function computeDusunData(qs: ApiQuestionnaire[]): DusunData[] {
     }
   }
 
-  const ORDER = ['Dusun I-A','Dusun I-B','Dusun II Timur','Dusun II Barat','Dusun III','Dusun IV'];
+  const sortedKeys = Object.keys(dusunMap).sort();
   const maxKK = Math.max(1, ...Object.values(dusunMap).map(d => d.kk));
 
-  return ORDER.map(name => {
-    const d = dusunMap[name] ?? { kk: 0, jiwa: 0, l: 0, p: 0 };
+  return sortedKeys.map((name, i) => {
+    const d = dusunMap[name];
     return {
       name,
       kk: d.kk,
       jiwa: d.jiwa,
       lakiLaki: d.l,
       perempuan: d.p,
-      target: Math.max(d.kk, Math.round(maxKK * 1.1)),  // estimated target
+      target: Math.max(d.kk, Math.round(maxKK * 1.1)),
       progress: maxKK > 0 ? Math.min(100, Math.round((d.kk / maxKK) * 100)) : 0,
+      color: DUSUN_COLORS[i % DUSUN_COLORS.length],
     };
   });
 }
@@ -94,15 +103,15 @@ export interface ComputedStats {
   totalJiwa: number;
   lakiLaki: number;
   perempuan: number;
-  perDusun: Record<string, number>;        // label → KK count
-  perPetugas: Record<string, number>;      // name → KK count
+  perDusun: Record<string, number>;
+  perPetugas: Record<string, number>;
   perPendidikan: Record<string, number>;
   perPekerjaan: Record<string, number>;
   perStatusKawin: Record<string, number>;
   perKeberadaan: Record<string, number>;
   perDisabilitas: Record<string, number>;
   perKewarganegaraan: Record<string, number>;
-  perStatusKk: Record<string, number>;     // r_103 value → count
+  perStatusKk: Record<string, number>;
   kelompokUsia: Record<string, number>;
 }
 
@@ -125,7 +134,7 @@ export function computeStats(qs: ApiQuestionnaire[]): ComputedStats {
   };
 
   const STATUS_KK_LABEL: Record<string, string> = {
-    '1': 'KK Suka Makmur', '2': 'Bukan KK SM', '3': 'Belum Punya KK',
+    '1': 'KK Desa', '2': 'Bukan KK Desa', '3': 'Belum Punya KK',
   };
   const PEKERJAAN_LABEL: Record<string, string> = {
     '1': 'Masih Bersekolah', '2': 'Sudah Bekerja', '3': 'Tidak Bekerja',

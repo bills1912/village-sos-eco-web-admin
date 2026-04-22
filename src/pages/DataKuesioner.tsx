@@ -1,30 +1,26 @@
 // src/pages/DataKuesioner.tsx
 import React, { useState, useMemo, useEffect } from 'react';
 import { Badge, Icons, CustomSelect } from '../components/UI';
-import { DUSUN_OPTIONS } from '../data/mockData';
 import { getQuestionnaires, deleteQuestionnaire, type ApiQuestionnaire } from '../services/api';
-import { toKuesionerList } from '../services/helpers';
+import { toKuesionerList, extractDusunOptions } from '../services/helpers';
 import type { Kuesioner } from '../types';
 
 export default function DataKuesioner(): JSX.Element {
-  const [search, setSearch] = useState('');
-  const [dusunFilter, setDusunFilter] = useState('all');
-  const [questionnaires, setQuestionnaires] = useState<ApiQuestionnaire[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
+  const [search, setSearch]             = useState('');
+  const [dusunFilter, setDusunFilter]   = useState('all');
+  const [allQuestionnaires, setAllQuestionnaires] = useState<ApiQuestionnaire[]>([]);
+  const [loading, setLoading]           = useState(true);
+  const [error, setError]               = useState<string | null>(null);
+  const [deleting, setDeleting]         = useState<string | null>(null);
+  const [page, setPage]                 = useState(1);
   const PAGE_SIZE = 20;
 
   async function fetchData(): Promise<void> {
     setLoading(true);
     setError(null);
     try {
-      const dusunParam = dusunFilter !== 'all'
-        ? String(DUSUN_OPTIONS.indexOf(dusunFilter) + 1)
-        : undefined;
-      const data = await getQuestionnaires({ dusun: dusunParam, limit: 200 });
-      setQuestionnaires(data);
+      const data = await getQuestionnaires({ limit: 500 });
+      setAllQuestionnaires(data);
       setPage(1);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Gagal memuat data');
@@ -33,28 +29,34 @@ export default function DataKuesioner(): JSX.Element {
     }
   }
 
-  useEffect(() => { void fetchData(); }, [dusunFilter]); // eslint-disable-line
+  useEffect(() => { void fetchData(); }, []);
 
-  const kuesionerList: Kuesioner[] = useMemo(() => toKuesionerList(questionnaires), [questionnaires]);
+  // Daftar dusun unik dari data aktual
+  const dusunOptions = useMemo(() => extractDusunOptions(allQuestionnaires), [allQuestionnaires]);
+
+  const kuesionerList: Kuesioner[] = useMemo(() => toKuesionerList(allQuestionnaires), [allQuestionnaires]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return kuesionerList.filter(d => {
-      const matchQ = d.nama.toLowerCase().includes(q) || d.noKk.includes(q) || d.petugas.toLowerCase().includes(q);
+      const matchQ = d.nama.toLowerCase().includes(q)
+        || d.noKk.includes(q)
+        || d.petugas.toLowerCase().includes(q)
+        || d.dusun.toLowerCase().includes(q);
       const matchD = dusunFilter === 'all' || d.dusun === dusunFilter;
       return matchQ && matchD;
     });
   }, [kuesionerList, search, dusunFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   async function handleDelete(id: string): Promise<void> {
     if (!confirm('Hapus data kuesioner ini?')) return;
     setDeleting(id);
     try {
       await deleteQuestionnaire(id);
-      setQuestionnaires(prev => prev.filter(q => q.id !== id));
+      setAllQuestionnaires(prev => prev.filter(q => q.id !== id));
     } catch (e) {
       alert('Gagal menghapus: ' + (e instanceof Error ? e.message : 'Error'));
     } finally {
@@ -77,7 +79,7 @@ export default function DataKuesioner(): JSX.Element {
           <Icons.Search />
           <input
             className="search-input"
-            placeholder="Cari nama / no.KK / petugas..."
+            placeholder="Cari nama / no.KK / petugas / dusun..."
             value={search}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
               setSearch(e.target.value);
@@ -87,10 +89,10 @@ export default function DataKuesioner(): JSX.Element {
         </div>
         <CustomSelect
           value={dusunFilter}
-          onChange={(v) => { setDusunFilter(v); setPage(1); }}
+          onChange={v => { setDusunFilter(v); setPage(1); }}
           options={[
-            { value: 'all', label: 'Semua Dusun' },
-            ...DUSUN_OPTIONS.map(d => ({ value: d, label: d })),
+            { value: 'all', label: 'Semua Dusun / Lingkungan' },
+            ...dusunOptions.map(d => ({ value: d, label: d })),
           ]}
         />
         <button className="btn btn-secondary btn-sm" onClick={fetchData} disabled={loading}>
@@ -103,7 +105,7 @@ export default function DataKuesioner(): JSX.Element {
           <thead>
             <tr>
               <th>#</th><th>Kepala Keluarga</th><th>No. KK</th>
-              <th>Dusun</th><th>Anggota</th><th>Petugas</th><th>Waktu</th><th>Aksi</th>
+              <th>Dusun / Lingkungan</th><th>Anggota</th><th>Petugas</th><th>Waktu</th><th>Aksi</th>
             </tr>
           </thead>
           <tbody>
@@ -124,7 +126,9 @@ export default function DataKuesioner(): JSX.Element {
                 <td style={{ color: 'var(--text3)', fontSize: 12 }}>{(page - 1) * PAGE_SIZE + idx + 1}</td>
                 <td><span className="td-name">{d.nama}</span></td>
                 <td><span className="mono">{d.noKk}</span></td>
-                <td><Badge type="teal">{d.dusun}</Badge></td>
+                <td>
+                  <Badge type="teal">{d.dusun}</Badge>
+                </td>
                 <td style={{ textAlign: 'center' }}><span style={{ fontWeight: 600 }}>{d.anggota}</span></td>
                 <td style={{ fontSize: 12, color: 'var(--text2)' }}>{d.petugas}</td>
                 <td style={{ fontSize: 12, color: 'var(--text3)' }}>{d.waktu}</td>
@@ -132,7 +136,7 @@ export default function DataKuesioner(): JSX.Element {
                   <button
                     className="btn btn-secondary btn-sm"
                     style={{ color: 'var(--red)', borderColor: 'var(--red)', opacity: deleting === d.id ? 0.5 : 1 }}
-                    onClick={() => handleDelete(d.id)}
+                    onClick={() => void handleDelete(d.id)}
                     disabled={deleting === d.id}
                   >
                     {deleting === d.id ? '...' : 'Hapus'}
@@ -145,15 +149,18 @@ export default function DataKuesioner(): JSX.Element {
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, fontSize: 12, color: 'var(--text3)' }}>
-        <span>Menampilkan {paginated.length} dari {filtered.length} data ({kuesionerList.length} total)</span>
+        <span>
+          Menampilkan {paginated.length} dari {filtered.length} data
+          {dusunFilter !== 'all' && ` (filter: ${dusunFilter})`}
+          {' '}({kuesionerList.length} total)
+        </span>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <button className="btn btn-secondary btn-sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>← Sebelumnya</button>
           {Array.from({ length: totalPages }, (_, i) => i + 1)
             .filter(p => Math.abs(p - page) <= 2)
             .map(p => (
               <button key={p} className={`btn btn-sm ${p === page ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setPage(p)}>{p}</button>
-            ))
-          }
+            ))}
           <button className="btn btn-secondary btn-sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Berikutnya →</button>
         </div>
       </div>

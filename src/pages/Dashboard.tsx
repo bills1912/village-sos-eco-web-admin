@@ -1,9 +1,9 @@
 // src/pages/Dashboard.tsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { StatCard, DonutChart, Icons, CustomSelect } from '../components/UI';
-import { DUSUN_COLORS, getAvatarColor, DUSUN_OPTIONS } from '../data/mockData';
+import { DUSUN_COLORS } from '../data/mockData';
 import { getQuestionnaires, type ApiQuestionnaire } from '../services/api';
-import { computeStats, computeDusunData, type ComputedStats } from '../services/helpers';
+import { computeStats, computeDusunData, extractDusunOptions, type ComputedStats } from '../services/helpers';
 import type { DusunData } from '../types';
 
 type DashboardTab = 'overview' | 'per-dusun' | 'petugas';
@@ -44,8 +44,8 @@ function OverviewTab({ stats, dusunData, loading }: { stats: ComputedStats; dusu
         </div>
         {stats.totalJiwa > 0 ? (
           <DonutChart data={[
-            { label: 'Laki-laki', value: stats.lakiLaki, color: '#2196F3' },
-            { label: 'Perempuan', value: stats.perempuan, color: '#E91E63' },
+            { label: 'Laki-laki', value: stats.lakiLaki,   color: '#2196F3' },
+            { label: 'Perempuan', value: stats.perempuan,  color: '#E91E63' },
           ]} />
         ) : (
           <div style={{ textAlign: 'center', padding: 32, color: 'var(--text3)', fontSize: 13 }}>Belum ada data</div>
@@ -55,19 +55,23 @@ function OverviewTab({ stats, dusunData, loading }: { stats: ComputedStats; dusu
       <div className="card">
         <div className="card-header">
           <div>
-            <div className="card-title">KK Terdata per Dusun</div>
+            <div className="card-title">KK Terdata per Dusun / Lingkungan</div>
             <div className="card-sub">Jumlah KK terdaftar</div>
           </div>
         </div>
-        {dusunData.map((d, i) => (
-          <div key={d.name} className="chart-bar-row">
-            <div className="chart-bar-label" style={{ fontSize: 11 }}>{d.name}</div>
-            <div className="chart-bar-track">
-              <div className="chart-bar-fill" style={{ width: `${d.progress}%`, background: DUSUN_COLORS[i] }} />
+        {dusunData.length === 0
+          ? <div style={{ textAlign: 'center', padding: 24, color: 'var(--text3)', fontSize: 13 }}>Belum ada data</div>
+          : dusunData.map((d, i) => (
+            <div key={d.name} className="chart-bar-row">
+              <div className="chart-bar-label" style={{ fontSize: 11 }} title={d.name}>
+                {d.name.length > 14 ? d.name.slice(0, 12) + '…' : d.name}
+              </div>
+              <div className="chart-bar-track">
+                <div className="chart-bar-fill" style={{ width: `${d.progress}%`, background: DUSUN_COLORS[i % DUSUN_COLORS.length] }} />
+              </div>
+              <div className="chart-bar-val">{d.kk}</div>
             </div>
-            <div className="chart-bar-val">{d.kk}</div>
-          </div>
-        ))}
+          ))}
       </div>
 
       <div className="card">
@@ -158,14 +162,16 @@ function PerDusunTab({ dusunData, loading }: { dusunData: DusunData[]; loading: 
     <div className="table-wrap">
       <table>
         <thead>
-          <tr><th>Dusun</th><th>KK Terdata</th><th>Total Jiwa</th><th>L / P</th><th>Progress</th></tr>
+          <tr><th>Dusun / Lingkungan</th><th>KK Terdata</th><th>Total Jiwa</th><th>L / P</th><th>Proporsi</th></tr>
         </thead>
         <tbody>
-          {dusunData.map((d, i) => (
+          {dusunData.length === 0 ? (
+            <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text3)', padding: 32 }}>Belum ada data</td></tr>
+          ) : dusunData.map((d, i) => (
             <tr key={d.name}>
               <td>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: DUSUN_COLORS[i], flexShrink: 0 }} />
+                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: DUSUN_COLORS[i % DUSUN_COLORS.length], flexShrink: 0 }} />
                   <span style={{ fontWeight: 600 }}>{d.name}</span>
                 </div>
               </td>
@@ -179,16 +185,13 @@ function PerDusunTab({ dusunData, loading }: { dusunData: DusunData[]; loading: 
               <td style={{ minWidth: 140 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <div className="progress-bar" style={{ flex: 1 }}>
-                    <div className="progress-fill" style={{ width: `${d.progress}%`, background: DUSUN_COLORS[i] }} />
+                    <div className="progress-fill" style={{ width: `${d.progress}%`, background: DUSUN_COLORS[i % DUSUN_COLORS.length] }} />
                   </div>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: DUSUN_COLORS[i] }}>{d.progress}%</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: DUSUN_COLORS[i % DUSUN_COLORS.length] }}>{d.progress}%</span>
                 </div>
               </td>
             </tr>
           ))}
-          {dusunData.every(d => d.kk === 0) && (
-            <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text3)', padding: 32 }}>Belum ada data</td></tr>
-          )}
         </tbody>
       </table>
     </div>
@@ -203,30 +206,35 @@ function PerPetugasTab({ stats, loading }: { stats: ComputedStats; loading: bool
     <div className="table-wrap">
       <table>
         <thead>
-          <tr><th>Petugas</th><th>KK Didata</th><th>Progress</th></tr>
+          <tr><th>Petugas</th><th>KK Didata</th><th>Proporsi</th></tr>
         </thead>
         <tbody>
           {petugasEntries.length === 0 ? (
             <tr><td colSpan={3} style={{ textAlign: 'center', color: 'var(--text3)', padding: 32 }}>Belum ada data</td></tr>
-          ) : petugasEntries.map(([name, count]) => (
-            <tr key={name}>
-              <td>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div className="avatar" style={{ background: getAvatarColor(name) }}>{name.split(' ').map((w: string) => w[0]).join('').slice(0,2).toUpperCase()}</div>
-                  <span className="td-name">{name}</span>
-                </div>
-              </td>
-              <td><span style={{ fontWeight: 700 }}>{count}</span> <span style={{ color: 'var(--text3)', fontSize: 12 }}>KK</span></td>
-              <td style={{ minWidth: 140 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <div className="progress-bar" style={{ flex: 1 }}>
-                    <div className="progress-fill" style={{ width: `${Math.round((count / max) * 100)}%`, background: 'var(--blue)' }} />
+          ) : petugasEntries.map(([name, count]) => {
+            const color = DUSUN_COLORS[name.charCodeAt(0) % DUSUN_COLORS.length];
+            return (
+              <tr key={name}>
+                <td>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div className="avatar" style={{ background: color }}>
+                      {name.split(' ').map((w: string) => w[0]).join('').slice(0,2).toUpperCase()}
+                    </div>
+                    <span className="td-name">{name}</span>
                   </div>
-                  <span style={{ fontSize: 11, color: 'var(--text3)' }}>{Math.round((count / max) * 100)}%</span>
-                </div>
-              </td>
-            </tr>
-          ))}
+                </td>
+                <td><span style={{ fontWeight: 700 }}>{count}</span> <span style={{ color: 'var(--text3)', fontSize: 12 }}>KK</span></td>
+                <td style={{ minWidth: 140 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div className="progress-bar" style={{ flex: 1 }}>
+                      <div className="progress-fill" style={{ width: `${Math.round((count / max) * 100)}%`, background: 'var(--blue)' }} />
+                    </div>
+                    <span style={{ fontSize: 11, color: 'var(--text3)' }}>{Math.round((count / max) * 100)}%</span>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -236,23 +244,20 @@ function PerPetugasTab({ stats, loading }: { stats: ComputedStats; loading: bool
 export default function Dashboard(): JSX.Element {
   const [tab, setTab] = useState<DashboardTab>('overview');
   const [filterDusun, setFilterDusun] = useState('all');
-  const [questionnaires, setQuestionnaires] = useState<ApiQuestionnaire[]>([]);
+  const [allQuestionnaires, setAllQuestionnaires] = useState<ApiQuestionnaire[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const tabs: [DashboardTab, string][] = [
-    ['overview', 'Ringkasan'], ['per-dusun', 'Per Dusun'], ['petugas', 'Per Petugas'],
+    ['overview', 'Ringkasan'], ['per-dusun', 'Per Dusun/Lingkungan'], ['petugas', 'Per Petugas'],
   ];
 
   async function fetchData(): Promise<void> {
     setLoading(true);
     setError(null);
     try {
-      const dusunParam = filterDusun !== 'all'
-        ? String(DUSUN_OPTIONS.indexOf(filterDusun) + 1)
-        : undefined;
-      const data = await getQuestionnaires({ dusun: dusunParam, limit: 200 });
-      setQuestionnaires(data);
+      const data = await getQuestionnaires({ limit: 500 });
+      setAllQuestionnaires(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Gagal memuat data');
     } finally {
@@ -260,7 +265,19 @@ export default function Dashboard(): JSX.Element {
     }
   }
 
-  useEffect(() => { void fetchData(); }, [filterDusun]); // eslint-disable-line
+  useEffect(() => { void fetchData(); }, []);
+
+  // Daftar dusun unik dari data aktual
+  const dusunOptions = useMemo(() => extractDusunOptions(allQuestionnaires), [allQuestionnaires]);
+
+  // Filter berdasarkan dusun yang dipilih
+  const questionnaires = useMemo(() => {
+    if (filterDusun === 'all') return allQuestionnaires;
+    return allQuestionnaires.filter(q => {
+      const label = q.dusun?.trim() ?? '';
+      return label === filterDusun;
+    });
+  }, [allQuestionnaires, filterDusun]);
 
   const stats = computeStats(questionnaires);
   const dusunData = computeDusunData(questionnaires);
@@ -277,10 +294,10 @@ export default function Dashboard(): JSX.Element {
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
           <CustomSelect
             value={filterDusun}
-            onChange={setFilterDusun}
+            onChange={v => setFilterDusun(v)}
             options={[
-              { value: 'all', label: 'Semua Dusun' },
-              ...DUSUN_OPTIONS.map(d => ({ value: d, label: d })),
+              { value: 'all', label: 'Semua Dusun / Lingkungan' },
+              ...dusunOptions.map(d => ({ value: d, label: d })),
             ]}
           />
           <button className="btn btn-secondary btn-sm" onClick={fetchData} disabled={loading}>
@@ -290,10 +307,10 @@ export default function Dashboard(): JSX.Element {
       </div>
 
       <div className="stats-grid">
-        <StatCard label="Total KK Terdata" value={loading ? '...' : stats.totalKK.toLocaleString()} icon={<Icons.Home />}   color="blue" />
-        <StatCard label="Total Jiwa"        value={loading ? '...' : stats.totalJiwa.toLocaleString()} icon={<Icons.People />} color="green" />
-        <StatCard label="Laki-laki"         value={loading ? '...' : stats.lakiLaki.toLocaleString()} icon={<Icons.Check />}  color="purple" />
-        <StatCard label="Perempuan"         value={loading ? '...' : stats.perempuan.toLocaleString()} icon={<Icons.Sync />}   color="orange" />
+        <StatCard label="Total KK Terdata"  value={loading ? '...' : stats.totalKK.toLocaleString()}   icon={<Icons.Home />}   color="blue"   />
+        <StatCard label="Total Jiwa"         value={loading ? '...' : stats.totalJiwa.toLocaleString()} icon={<Icons.People />} color="green"  />
+        <StatCard label="Laki-laki"          value={loading ? '...' : stats.lakiLaki.toLocaleString()}  icon={<Icons.Check />}  color="purple" />
+        <StatCard label="Perempuan"          value={loading ? '...' : stats.perempuan.toLocaleString()} icon={<Icons.Sync />}   color="orange" />
       </div>
 
       {tab === 'overview'  && <OverviewTab stats={stats} dusunData={dusunData} loading={loading} />}

@@ -1,24 +1,24 @@
 // src/pages/Laporan.tsx
-import { useState, useEffect } from 'react';
-import { DUSUN_COLORS, DUSUN_OPTIONS } from '../data/mockData';
+import { useState, useEffect, useMemo } from 'react';
+import { DUSUN_COLORS } from '../data/mockData';
 import { getQuestionnaires, type ApiQuestionnaire } from '../services/api';
-import { computeStats, computeDusunData } from '../services/helpers';
+import { computeStats, computeDusunData, extractDusunOptions } from '../services/helpers';
 import { CustomSelect } from '../components/UI';
 
 const AGE_ORDER = ['0–4','5–14','15–24','25–39','40–59','60+'];
 
 export default function Laporan(): JSX.Element {
-  const [questionnaires, setQuestionnaires] = useState<ApiQuestionnaire[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [allQuestionnaires, setAllQuestionnaires] = useState<ApiQuestionnaire[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState<string | null>(null);
   const [filterDusun, setFilterDusun] = useState('all');
 
   async function fetchData(): Promise<void> {
     setLoading(true);
     setError(null);
     try {
-      const data = await getQuestionnaires({ limit: 200 });
-      setQuestionnaires(data);
+      const data = await getQuestionnaires({ limit: 500 });
+      setAllQuestionnaires(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Gagal memuat data');
     } finally {
@@ -28,15 +28,17 @@ export default function Laporan(): JSX.Element {
 
   useEffect(() => { void fetchData(); }, []);
 
-  const filtered = filterDusun === 'all'
-    ? questionnaires
-    : questionnaires.filter(q => {
-        const idx = DUSUN_OPTIONS.indexOf(filterDusun);
-        return q.dusun === String(idx + 1);
-      });
+  // Daftar dusun unik dari data aktual
+  const dusunOptions = useMemo(() => extractDusunOptions(allQuestionnaires), [allQuestionnaires]);
 
-  const stats = computeStats(filtered);
-  const dusunData = computeDusunData(questionnaires); // always all dusun for the table
+  // Filter berdasarkan dusun dipilih
+  const filtered = useMemo(() => {
+    if (filterDusun === 'all') return allQuestionnaires;
+    return allQuestionnaires.filter(q => (q.dusun?.trim() ?? '') === filterDusun);
+  }, [allQuestionnaires, filterDusun]);
+
+  const stats    = computeStats(filtered);
+  const dusunData = computeDusunData(allQuestionnaires); // selalu semua dusun untuk tabel rekapitulasi
 
   if (loading) return (
     <div style={{ padding: 48, textAlign: 'center', color: 'var(--text3)' }}>
@@ -44,8 +46,6 @@ export default function Laporan(): JSX.Element {
       <div>Memuat laporan...</div>
     </div>
   );
-
-  const syncRate = stats.totalKK > 0 ? 100 : 0; // all server data is "synced"
 
   return (
     <div>
@@ -64,19 +64,25 @@ export default function Laporan(): JSX.Element {
           value={filterDusun}
           onChange={setFilterDusun}
           options={[
-            { value: 'all', label: 'Semua Dusun' },
-            ...DUSUN_OPTIONS.map(d => ({ value: d, label: d })),
+            { value: 'all', label: 'Semua Dusun / Lingkungan' },
+            ...dusunOptions.map(d => ({ value: d, label: d })),
           ]}
         />
         <button className="btn btn-secondary btn-sm" onClick={fetchData}>↺ Refresh</button>
+        {filterDusun !== 'all' && (
+          <div style={{ marginLeft: 4, padding: '4px 10px', background: 'var(--blue-light)', color: 'var(--blue)', borderRadius: 20, fontSize: 12, fontWeight: 600 }}>
+            Filter aktif: {filterDusun}
+            <span style={{ marginLeft: 8, cursor: 'pointer' }} onClick={() => setFilterDusun('all')}>✕</span>
+          </div>
+        )}
       </div>
 
       {/* Summary cards */}
       <div className="three-col" style={{ marginBottom: 20 }}>
         {[
-          { label: 'Total KK Desa',        val: stats.totalKK.toLocaleString(), icon: '🏠', color: 'var(--blue)'   },
-          { label: 'Total Jiwa',           val: stats.totalJiwa.toLocaleString(), icon: '👥', color: 'var(--green)'  },
-          { label: 'Tingkat Sinkronisasi', val: `${syncRate}%`,                  icon: '🔄', color: 'var(--purple)' },
+          { label: 'Total KK Terdata',   val: stats.totalKK.toLocaleString(),   icon: '🏠', color: 'var(--blue)'   },
+          { label: 'Total Jiwa',         val: stats.totalJiwa.toLocaleString(), icon: '👥', color: 'var(--green)'  },
+          { label: 'Dusun / Lingkungan', val: dusunOptions.length === 0 ? '-' : `${dusunOptions.length} area`, icon: '🗺️', color: 'var(--purple)' },
         ].map(s => (
           <div key={s.label} className="card" style={{ padding: '18px' }}>
             <div style={{ fontSize: 28, marginBottom: 8 }}>{s.icon}</div>
@@ -90,19 +96,22 @@ export default function Laporan(): JSX.Element {
         {/* Per dusun table */}
         <div className="card">
           <div className="card-header">
-            <div className="card-title">Rekapitulasi per Dusun</div>
+            <div className="card-title">Rekapitulasi per Dusun / Lingkungan</div>
+            <div className="card-sub">{dusunData.length} area tercatat</div>
           </div>
           <div className="table-wrap" style={{ border: 'none', borderRadius: 0 }}>
             <table>
               <thead>
-                <tr><th>Dusun</th><th>KK</th><th>Jiwa</th><th>L</th><th>P</th></tr>
+                <tr><th>Dusun / Lingkungan</th><th>KK</th><th>Jiwa</th><th>L</th><th>P</th></tr>
               </thead>
               <tbody>
-                {dusunData.map((d, i) => (
+                {dusunData.length === 0 ? (
+                  <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text3)', padding: 24 }}>Belum ada data</td></tr>
+                ) : dusunData.map((d, i) => (
                   <tr key={d.name}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: DUSUN_COLORS[i] }} />
+                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: DUSUN_COLORS[i % DUSUN_COLORS.length] }} />
                         {d.name}
                       </div>
                     </td>
@@ -112,13 +121,15 @@ export default function Laporan(): JSX.Element {
                     <td style={{ color: '#E91E63' }}>{d.perempuan ?? '–'}</td>
                   </tr>
                 ))}
-                <tr style={{ fontWeight: 700, background: 'var(--bg)' }}>
-                  <td>Total</td>
-                  <td>{dusunData.reduce((s, d) => s + d.kk, 0)}</td>
-                  <td>{dusunData.reduce((s, d) => s + d.jiwa, 0)}</td>
-                  <td style={{ color: 'var(--blue-mid)' }}>{dusunData.reduce((s, d) => s + (d.lakiLaki ?? 0), 0)}</td>
-                  <td style={{ color: '#E91E63' }}>{dusunData.reduce((s, d) => s + (d.perempuan ?? 0), 0)}</td>
-                </tr>
+                {dusunData.length > 0 && (
+                  <tr style={{ fontWeight: 700, background: 'var(--bg)' }}>
+                    <td>Total</td>
+                    <td>{dusunData.reduce((s, d) => s + d.kk, 0)}</td>
+                    <td>{dusunData.reduce((s, d) => s + d.jiwa, 0)}</td>
+                    <td style={{ color: 'var(--blue-mid)' }}>{dusunData.reduce((s, d) => s + (d.lakiLaki ?? 0), 0)}</td>
+                    <td style={{ color: '#E91E63' }}>{dusunData.reduce((s, d) => s + (d.perempuan ?? 0), 0)}</td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -145,6 +156,36 @@ export default function Laporan(): JSX.Element {
                 );
               })}
         </div>
+
+        {/* Wilayah administratif */}
+        {(() => {
+          const desaMap: Record<string, number> = {};
+          for (const q of filtered) {
+            const key = q.nama_desa ?? q.kode_desa ?? 'Tidak Diketahui';
+            desaMap[key] = (desaMap[key] ?? 0) + 1;
+          }
+          const desaEntries = Object.entries(desaMap).sort((a, b) => b[1] - a[1]);
+          if (desaEntries.length <= 1) return null;
+          return (
+            <div className="card">
+              <div className="card-header"><div className="card-title">Distribusi per Desa / Kelurahan</div></div>
+              {desaEntries.map(([label, count], i) => {
+                const pct = filtered.length > 0 ? Math.round((count / filtered.length) * 100) : 0;
+                return (
+                  <div key={label} style={{ marginBottom: 10 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 3 }}>
+                      <span>{label}</span>
+                      <span style={{ fontWeight: 700, color: DUSUN_COLORS[i % DUSUN_COLORS.length] }}>{count} KK ({pct}%)</span>
+                    </div>
+                    <div className="progress-bar">
+                      <div className="progress-fill" style={{ width: `${pct}%`, background: DUSUN_COLORS[i % DUSUN_COLORS.length] }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
 
         {/* Distribusi Usia */}
         <div className="card">
@@ -189,6 +230,27 @@ export default function Laporan(): JSX.Element {
                 );
               })}
         </div>
+
+        {/* Pekerjaan */}
+        {Object.keys(stats.perPekerjaan).length > 0 && (
+          <div className="card">
+            <div className="card-header"><div className="card-title">Status Pekerjaan</div></div>
+            {Object.entries(stats.perPekerjaan).map(([label, count], i) => {
+              const pct = stats.totalJiwa > 0 ? Math.round((count / stats.totalJiwa) * 100) : 0;
+              return (
+                <div key={label} style={{ marginBottom: 10 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 3 }}>
+                    <span>{label}</span>
+                    <span style={{ fontWeight: 700, color: DUSUN_COLORS[i % DUSUN_COLORS.length] }}>{count} ({pct}%)</span>
+                  </div>
+                  <div className="progress-bar">
+                    <div className="progress-fill" style={{ width: `${pct}%`, background: DUSUN_COLORS[i % DUSUN_COLORS.length] }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* Disabilitas */}
         {Object.keys(stats.perDisabilitas).length > 0 && (
