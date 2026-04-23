@@ -1,13 +1,13 @@
 // src/pages/Dashboard.tsx
 import { useState, useEffect, useMemo } from 'react';
-import { StatCard, DonutChart, Icons, CustomSelect } from '../components/UI';
+import { StatCard, DonutChart, Icons } from '../components/UI';
 import { WilayahFilterBar } from '../components/WilayahFilter';
 import { DUSUN_COLORS } from '../data/mockData';
 import { getQuestionnaires, type ApiQuestionnaire } from '../services/api';
 import {
   computeStats, computeDusunData, filterByWilayah,
   computePerProvinsi, computePerKabupaten, computePerKecamatan, computePerDesa,
-  type ComputedStats, type WilayahFilter, type WilayahAggItem,
+  type ComputedStats, type WilayahFilter,
 } from '../services/helpers';
 import type { DusunData } from '../types';
 

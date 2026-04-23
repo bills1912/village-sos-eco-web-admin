@@ -1,5 +1,5 @@
 // src/components/WilayahFilter.tsx
-import React, { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { CustomSelect } from './UI';
 import type { ApiQuestionnaire } from '../services/api';
 import {
@@ -47,12 +47,12 @@ export function WilayahFilterBar({ questionnaires, value, onChange }: WilayahFil
     : value.kodeProvinsi ? 'Provinsi'
     : null;
 
-  const activeLabel = value.dusun ? value.dusun
-    : value.kodeDesa ? (desaOpts.find(d => d.value === value.kodeDesa)?.label ?? value.kodeDesa)
-    : value.kodeKecamatan ? (kecamatanOpts.find(d => d.value === value.kodeKecamatan)?.label ?? value.kodeKecamatan)
-    : value.kodeKabupaten ? (kabupatenOpts.find(d => d.value === value.kodeKabupaten)?.label ?? value.kodeKabupaten)
-    : value.kodeProvinsi ? (provinsiOpts.find(d => d.value === value.kodeProvinsi)?.label ?? value.kodeProvinsi)
-    : null;
+//   const activeLabel = value.dusun ? value.dusun
+//     : value.kodeDesa ? (desaOpts.find(d => d.value === value.kodeDesa)?.label ?? value.kodeDesa)
+//     : value.kodeKecamatan ? (kecamatanOpts.find(d => d.value === value.kodeKecamatan)?.label ?? value.kodeKecamatan)
+//     : value.kodeKabupaten ? (kabupatenOpts.find(d => d.value === value.kodeKabupaten)?.label ?? value.kodeKabupaten)
+//     : value.kodeProvinsi ? (provinsiOpts.find(d => d.value === value.kodeProvinsi)?.label ?? value.kodeProvinsi)
+//     : null;
 
   function setProvinsi(v: string): void {
     onChange(v ? { kodeProvinsi: v } : {});

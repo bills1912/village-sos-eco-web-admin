@@ -7,7 +7,7 @@ import {
   computePerProvinsi, computePerKabupaten, computePerKecamatan, computePerDesa,
   type WilayahFilter,
 } from '../services/helpers';
-import { CustomSelect } from '../components/UI';
+// import { CustomSelect } from '../components/UI';
 import { WilayahFilterBar } from '../components/WilayahFilter';
 
 const AGE_ORDER = ['0–4','5–14','15–24','25–39','40–59','60+'];
@@ -43,10 +43,10 @@ function SummaryCard({ icon, label, value, color }: { icon: string; label: strin
 // ── Grouped bar (side-by-side for gender) ─────────────────────────────────────
 function GenderTable({ items }: { items: { nama: string; kk: number; jiwa: number; l: number; p: number }[] }): JSX.Element {
   const total = items.reduce((s, i) => s + i.kk, 0);
-  const maxKK = Math.max(1, ...items.map(i => i.kk));
+  // const maxKK = Math.max(1, ...items.map(i => i.kk));
   return (
     <div>
-      {items.map((item, i) => (
+      {items.map((item) => (
         <div key={item.nama} style={{ marginBottom: 14 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 3 }}>
             <span style={{ fontWeight: 600, color: 'var(--text1)' }}>{item.nama}</span>
@@ -97,7 +97,7 @@ export default function Laporan(): JSX.Element {
   const hasKabupaten = Object.keys(stats.perKabupaten).length > 0;
   const hasKecamatan = Object.keys(stats.perKecamatan).length > 0;
   const hasDesa      = Object.keys(stats.perDesa).length > 0;
-  const hasMultiDesa = Object.keys(stats.perDesa).length > 1;
+  // const hasMultiDesa = Object.keys(stats.perDesa).length > 1;
 
   const perProvinsiItems  = computePerProvinsi(filtered);
   const perKabupatenItems = computePerKabupaten(filtered);
